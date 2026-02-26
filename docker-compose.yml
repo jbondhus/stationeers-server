@@ -1,0 +1,32 @@
+services:
+  stationeers:
+    build: .
+    image: stationeers-server
+    container_name: stationeers-${SERVER_NAME:-default}
+    restart: unless-stopped
+    ports:
+      - "${GAME_PORT:-27016}:${GAME_PORT:-27016}/udp"
+      - "${UPDATE_PORT:-27015}:${UPDATE_PORT:-27015}/udp"
+    environment:
+      TZ: "${TZ:-UTC}"
+      SERVER_NAME: "${SERVER_NAME:-default}"
+      DISPLAY_NAME: "${DISPLAY_NAME:-}"
+      SERVER_PASSWORD: "${SERVER_PASSWORD:-}"
+      SERVER_AUTH_SECRET: "${SERVER_AUTH_SECRET:-}"
+      SAVE_NAME: "${SAVE_NAME:-default}"
+      WORLD_TYPE: "${WORLD_TYPE:-Mars2}"
+      WORLD_DIFFICULTY: "${WORLD_DIFFICULTY:-Normal}"
+      GAME_PORT: "${GAME_PORT:-27016}"
+      UPDATE_PORT: "${UPDATE_PORT:-27015}"
+      MAX_PLAYERS: "${MAX_PLAYERS:-10}"
+      AUTO_SAVE: "${AUTO_SAVE:-true}"
+      SAVE_INTERVAL: "${SAVE_INTERVAL:-300}"
+      SERVER_VISIBLE: "${SERVER_VISIBLE:-true}"
+      AUTO_PAUSE: "${AUTO_PAUSE:-true}"
+    volumes:
+      - server-files:/home/stationeers/server
+      - ./data/${SERVER_NAME:-default}:/home/stationeers/server/saves
+
+volumes:
+  server-files:
+    name: stationeers-${SERVER_NAME:-default}-files
