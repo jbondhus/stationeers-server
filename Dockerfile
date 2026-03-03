@@ -23,6 +23,9 @@ ENV SAVE_INTERVAL=300
 ENV SERVER_VISIBLE=true
 ENV AUTO_PAUSE=true
 
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
 RUN dpkg --add-architecture i386 \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -31,7 +34,10 @@ RUN dpkg --add-architecture i386 \
         ca-certificates \
         curl \
         gosu \
-    && rm -rf /var/lib/apt/lists/*
+        locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen \
+    && locale-gen
 
 RUN mkdir -p "${STEAMCMD_DIR}" \
     && curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" \
