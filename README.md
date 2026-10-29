@@ -34,24 +34,43 @@ All settings are controlled via environment variables. Copy `.env.example` and a
 | `WORLD_TYPE` | `Mars2` | World type (`Mars2`, `Lunar`, `Europa3`, `MimasHerschel`, `Vulcan`, `Venus`) |
 | `WORLD_DIFFICULTY` | `Normal` | Difficulty setting |
 | `SAVE_NAME` | `default` | Save file name inside the saves directory |
-| `SERVER_VISIBLE` | `true` | List in the public server browser |
+| `SERVER_VISIBLE` | `false` | List in the public server browser (off: the server is tailnet-only) |
 | `SERVER_PASSWORD` | *(empty)* | Password required to join |
 | `SERVER_AUTH_SECRET` | *(empty)* | Auth secret for server administration |
 | `MAX_PLAYERS` | `10` | Maximum concurrent players |
 | `AUTO_SAVE` | `true` | Enable automatic saving |
 | `SAVE_INTERVAL` | `300` | Seconds between auto-saves |
 | `AUTO_PAUSE` | `true` | Pause the server when no players are connected |
+| `TS_AUTHKEY` | *(empty)* | One-off tagged Tailscale auth key for the world's node (first start only) |
+| `TS_TAG` | `tag:house-game` | Tag the node advertises; the tailnet policy keys on it |
+| `MEM_LIMIT` | `8g` | Memory limit of the game container |
 
 ## Volumes
 
 | Mount | Purpose |
 |---|---|
 | `server-files` (named volume) | Game server installation managed by SteamCMD |
+| `stationeers-<SERVER_NAME>-ts` (named volume) | The world's Tailscale node identity |
 | `./data/<SERVER_NAME>/` (bind mount) | World save data, persisted on the host |
+
+## Networking: one Tailscale node per world
+
+Each world's compose project includes a `tailscale` sidecar, and the game server runs in the sidecar's network namespace. The
+world is reachable at its node's tailnet address on `GAME_PORT`; nothing is published on the host and no port forwarding exists.
+This is what makes the server usable from a home connection behind CGNAT.
+
+- The node is named `stationeers-<SERVER_NAME>` and carries the tag in `TS_TAG`; the tailnet policy grants the game ports to
+  the people who may play (shared-in users and admins) and nothing else. The node has no SSH and no source role.
+- First start: create a one-off, tagged, non-reusable auth key in the admin console and put it in the env file as `TS_AUTHKEY`.
+  The key is used once; the node's identity then lives in the `stationeers-<SERVER_NAME>-ts` volume.
+- Friends: share the world's node with them from the admin console (Machines → the node → Share). They install Tailscale,
+  accept the share, and join in-game by direct connect with the node's address and `GAME_PORT`. The in-game server browser does
+  not list it (`SERVER_VISIBLE=false`).
+- The sidecar needs `NET_ADMIN` and `/dev/net/tun`; both work under Docker's user-namespace remap (verified 2026-10-29).
 
 ## Ports
 
-Both ports are **UDP**. Forward them in your firewall/router for the server to be reachable.
+Both ports are **UDP**, open on the world's tailnet node.
 
 | Port | Default | Purpose |
 |---|---|---|
