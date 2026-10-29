@@ -1,12 +1,34 @@
+# One world per env file: `docker compose --env-file .env.<world> up -d`. SERVER_NAME keys the project's container names, its
+# save directory (./data/<world>/) and its volumes, so every world is an independent instance of this file.
+#
+# Each world has its own Tailscale node (the `tailscale` sidecar): the game server runs in the sidecar's network namespace, so its
+# UDP ports are reachable at the node's tailnet address and nothing is published on the host. A world is handed to friends by
+# sharing its node from the Tailscale admin console; a friend joins by the node's address and GAME_PORT. The node is tagged
+# (TS_TAG) so the tailnet policy decides who may reach the game ports; the sidecar never gets SSH or a source role.
 services:
+  tailscale:
+    image: tailscale/tailscale:v1.104.4
+    container_name: stationeers-${SERVER_NAME:-default}-ts
+    hostname: stationeers-${SERVER_NAME:-default}   # the node's tailnet name
+    restart: unless-stopped
+    cap_add: ["NET_ADMIN"]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    environment:
+      TS_AUTHKEY: "${TS_AUTHKEY:-}"                 # a one-off tagged key; used only until the node's state exists in ts-state
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_ACCEPT_DNS: "false"
+      TS_EXTRA_ARGS: "--advertise-tags=${TS_TAG:-tag:house-game}"
+    volumes:
+      - ts-state:/var/lib/tailscale
+
   stationeers:
     build: .
     image: stationeers-server
     container_name: stationeers-${SERVER_NAME:-default}
     restart: unless-stopped
-    ports:
-      - "${GAME_PORT:-27016}:${GAME_PORT:-27016}/udp"
-      - "${UPDATE_PORT:-27015}:${UPDATE_PORT:-27015}/udp"
+    network_mode: "service:tailscale"               # the game listens inside the node; no host ports
+    depends_on: ["tailscale"]
+    mem_limit: "${MEM_LIMIT:-8g}"                   # a loaded world holds ~7 GiB whether or not anyone is playing
     environment:
       TZ: "${TZ:-UTC}"
       SERVER_NAME: "${SERVER_NAME:-default}"
@@ -21,7 +43,7 @@ services:
       MAX_PLAYERS: "${MAX_PLAYERS:-10}"
       AUTO_SAVE: "${AUTO_SAVE:-true}"
       SAVE_INTERVAL: "${SAVE_INTERVAL:-300}"
-      SERVER_VISIBLE: "${SERVER_VISIBLE:-true}"
+      SERVER_VISIBLE: "${SERVER_VISIBLE:-false}"
       AUTO_PAUSE: "${AUTO_PAUSE:-true}"
     volumes:
       - server-files:/home/stationeers/server
@@ -30,3 +52,5 @@ services:
 volumes:
   server-files:
     name: stationeers-${SERVER_NAME:-default}-files
+  ts-state:
+    name: stationeers-${SERVER_NAME:-default}-ts
